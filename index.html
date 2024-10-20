@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Управление через Bluetooth</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#4CAF50">
+    <link rel="apple-touch-icon" href="/images/icon-192.png">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+        h1 {
+            color: #4CAF50;
+        }
+        button {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 15px 32px;
+            text-align: center;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 10px;
+            transition: background-color 0.3s ease;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        input {
+            padding: 10px;
+            margin: 5px 0;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            width: 200px;
+        }
+        .status {
+            margin-top: 20px;
+            font-size: 18px;
+            color: #333;
+        }
+        .fields {
+            margin-top: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+        .fields div {
+            margin-bottom: 10px;
+        }
+        .output {
+            margin-top: 20px;
+            font-size: 18px;
+            color: #333;
+            text-align: center;
+        }
+        .output span {
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>Управление Raspberry Pi Pico</h1>
+
+    <button onclick="connectToHC05()">Подключиться к HC-05</button>
+
+    <div class="status">
+        <p id="status">Статус: Не подключено</p>
+    </div>
+
+    <div class="fields">
+        <div>
+            <label for="minTemp">Мин. температура:</label>
+            <input type="text" id="minTemp" placeholder="Введите мин. температуру">
+        </div>
+        <div>
+            <label for="maxTemp">Макс. температура:</label>
+            <input type="text" id="maxTemp" placeholder="Введите макс. температуру">
+        </div>
+        <div>
+            <label for="initialDelay">Начальная задержка:</label>
+            <input type="text" id="initialDelay" placeholder="Введите начальную задержку">
+        </div>
+        <div>
+            <label for="firstAngle">Первый угол:</label>
+            <input type="text" id="firstAngle" placeholder="Введите первый угол">
+        </div>
+        <div>
+            <label for="secondAngle">Второй угол:</label>
+            <input type="text" id="secondAngle" placeholder="Введите второй угол">
+        </div>
+    </div>
+
+    <button onclick="updateSettings()">Обновить настройки</button>
+    <button onclick="getCurrentSettings()">Получить текущие настройки</button>
+
+    <div class="output">
+        <p>Текущий угол серво: <span id="servoAngle">0</span>°</p>
+        <p>Текущая температура: <span id="temperature">0</span>°C</p>
+    </div>
+
+    <script>
+        let bluetoothDevice;
+        let characteristic;
+
+        async function connectToHC05() {
+            try {
+                bluetoothDevice = await navigator.bluetooth.requestDevice({
+                    filters: [{ name: 'HC-05' }],
+                    optionalServices: ['00001101-0000-1000-8000-00805f9b34fb']
+                });
+
+                const server = await bluetoothDevice.gatt.connect();
+                const service = await server.getPrimaryService('00001101-0000-1000-8000-00805f9b34fb');
+                characteristic = await service.getCharacteristic('00001101-0000-1000-8000-00805f9b34fb');
+
+                document.getElementById('status').innerText = "Статус: Подключено";
+            } catch (error) {
+                console.log('Ошибка подключения: ' + error);
+            }
+        }
+
+        async function updateSettings() {
+            const minTemp = document.getElementById("minTemp").value;
+            const maxTemp = document.getElementById("maxTemp").value;
+            const initialDelay = document.getElementById("initialDelay").value;
+            const firstAngle = document.getElementById("firstAngle").value;
+            const secondAngle = document.getElementById("secondAngle").value;
+
+            const settings = `SET MIN_TEMP_THRESHOLD=${minTemp};SET MAX_TEMP_THRESHOLD=${maxTemp};SET INITIAL_DELAY=${initialDelay};SET FIRST_ANGLE=${firstAngle};SET SECOND_ANGLE=${secondAngle}`;
+            await sendCommand(settings);
+        }
+
+        async function getCurrentSettings() {
+            await sendCommand("GET");
+        }
+
+        async function sendCommand(command) {
+            const encoder = new TextEncoder();
+            const data = encoder.encode(command + "\n");
+
+            try {
+                await characteristic.writeValue(data);
+            } catch (error) {
+                console.log('Ошибка отправки команды: ' + error);
+            }
+        }
+    </script>
+</body>
+</html>
